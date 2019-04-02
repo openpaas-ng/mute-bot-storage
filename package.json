@@ -1,21 +1,20 @@
 {
   "name": "mute-bot-storage",
-  "version": "1.0.0",
+  "version": "2.3.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "npm run build:live",
+    "dev": "nodemon --watch src -e js,ts --exec 'npm run build && chmod +x dist/server.js && node dist/server.js --cors --logLevel trace | bunyan'",
     "build": "webpack",
-    "build:live": "nodemon --exec ts-node ./src/index.ts -- --logLevel trace | bunyan",
-    "builddev": "npm run build && scp server.js ovhmute:/root/container/botStorage",
-    "lint": "tslint src/*.ts src/**/*.ts -e 'src/**/*.proto' -e 'src/**/*.d.ts' -p tsconfig.json",
+    "lint": "tslint --fix -p tsconfig.json 'src/**/*.ts' -e 'src/**/*.proto' -e 'src/**/*.d.ts' && prettier --write --list-different 'src/**/*.ts' './*.{ts,js,json,md}'  && markdownlint ./*.md -i 'CHANGELOG.md'",
     "proto": "pbjs -t static-module -w es6 --no-verify --no-delimited --no-convert src/proto/index.proto -o src/proto/index.es6.js && pbts src/proto/index.es6.js -o src/proto/index.d.ts",
     "postproto": "babel --presets env -o src/proto/index.js src/proto/index.es6.js && rm src/proto/index.es6.js",
     "cz": "git-cz",
-    "precommit": "npm run lint",
-    "commitmsg": "validate-commit-msg",
-    "semantic-release": "semantic-release --no-ci"
+    "precommit": "lint-staged && npm run build && git add dist/*",
+    "commitmsg": "commitlint -e $GIT_PARAMS",
+    "prerelease": "npm run build && git add dist/*",
+    "release": "standard-version --no-verify"
   },
   "files": [
     "dist/server.js"
@@ -31,48 +30,78 @@
   },
   "license": "AGPL-3.0",
   "dependencies": {
+    "@coast-team/mute-core": "^9.1.2",
+    "@coast-team/mute-crypto": "^0.4.1",
     "bunyan": "^1.8.12",
-    "commander": "^2.14.1",
-    "kcors": "^2.2.1",
-    "koa": "^2.5.0",
-    "koa-bodyparser": "^4.2.0",
+    "commander": "^2.18.0",
+    "kcors": "^2.2.2",
+    "koa": "^2.5.2",
+    "koa-bodyparser": "^4.2.1",
     "koa-router": "^7.4.0",
-    "mongoose": "^5.0.7",
-    "mute-core": "0.4.0",
-    "netflux": "^3.0.0",
-    "rxjs": "^5.5.6",
-    "uws": "^9.14.0"
+    "mongoose": "^5.2.13",
+    "netflux": "^4.3.1",
+    "node-webcrypto-ossl": "^1.0.38",
+    "protobufjs": "^6.8.8",
+    "rxjs": "^6.3.3",
+    "text-encoding": "^0.6.4",
+    "uws": "10.148.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^7.1.2",
+    "@commitlint/config-conventional": "^7.1.2",
     "@types/bunyan": "^1.8.4",
     "@types/commander": "^2.12.2",
-    "@types/express": "^4.11.1",
-    "@types/kcors": "^2.2.2",
-    "@types/koa": "^2.0.44",
-    "@types/koa-bodyparser": "^4.2.0",
-    "@types/koa-router": "^7.0.27",
-    "@types/mongoose": "^5.0.3",
-    "@types/node": "^8.9.4",
+    "@types/kcors": "^2.2.3",
+    "@types/koa": "^2.0.46",
+    "@types/koa-bodyparser": "^5.0.1",
+    "@types/koa-router": "^7.0.31",
+    "@types/mongoose": "^5.2.11",
+    "@types/node": "^8.10.29",
     "babel-cli": "^6.26.0",
-    "babel-preset-env": "^1.6.1",
-    "commitizen": "^2.9.6",
+    "babel-preset-env": "^1.7.0",
+    "commitizen": "^2.10.1",
     "cz-conventional-changelog": "^2.1.0",
     "husky": "^0.14.3",
-    "nodemon": "^1.17.1",
-    "semantic-release": "^12.4.1",
-    "ts-loader": "^4.0.0",
-    "ts-node": "^5.0.0",
-    "tslint": "^5.9.1",
-    "tslint-eslint-rules": "^5.1.0",
-    "typescript": "~2.7.2",
+    "lint-staged": "^7.2.2",
+    "markdownlint-cli": "^0.13.0",
+    "nodemon": "^1.18.4",
+    "prettier": "^1.14.2",
+    "standard-version": "^4.4.0",
+    "ts-loader": "^5.0.0",
+    "tslint": "^5.11.0",
+    "tslint-config-prettier": "^1.15.0",
+    "typescript": "^3.0.3",
     "validate-commit-msg": "^2.11.1",
-    "webpack": "^4.0.1",
-    "webpack-cli": "^2.0.9",
-    "webpack-node-externals": "^1.5.4"
+    "webpack": "^4.17.2",
+    "webpack-cli": "^3.1.0",
+    "webpack-node-externals": "^1.7.2"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
   },
   "config": {
     "commitizen": {
       "path": "node_modules/cz-conventional-changelog"
     }
+  },
+  "lint-staged": {
+    "linters": {
+      "*.md": [
+        "prettier --write --list-different",
+        "git add",
+        "markdownlint -i 'CHANGELOG.md'"
+      ],
+      "*.ts": [
+        "tslint --fix -p tsconfig.json -e src/proto/* -e 'src/**/*.d.ts'",
+        "git add"
+      ],
+      "*.{ts,json,scss,css}": [
+        "prettier --write --list-different -e *proto*",
+        "git add"
+      ]
+    },
+    "concurrent": false
   }
 }
